@@ -1,82 +1,46 @@
 from flask import Flask, request
-from flask_restful import Resource, Api, marshal_with, fields
-from flask_sqlalchemy import SQLAlchemy
+from flask_restful import Resource, Api
+from models import Task
+import config
 
-app = Flask(__name__)
+app = config.app
+mysql = config.mysql
 api = Api(app)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///todo.db'
-db = SQLAlchemy(app)
 
-# to initialize db, run :
-# python
-# from app import db
-# db.create_all()
+class TaskAPI(Resource):
+    def get(self, id=None):
+        if id:
+            task = Task(id)
+            data = task.get()
+        else:
+            task = Task()
+            data = task.get_all()
 
-taskFields = {
-    'id': fields.Integer,
-    'name':  fields.String
-}
+        return {
+            'status': 'success',
+            'data': data
+        }
 
-# db model
-
-
-class Task(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String, nullable=False)
-
-    def __repr__(self):
-        return self.name
-
-# handler
-
-
-class Items(Resource):
-    @marshal_with(taskFields)
-    def get(self):
-        tasks = Task.query.all()
-        return tasks
-
-    @marshal_with(taskFields)
     def post(self):
-        data = request.json
+        name = request.json['name']
+        task = Task(name=name)
+        task.save()
+        return {'status': 'success'}
 
-        task = Task(name=data['name'])
-        db.session.add(task)
-        db.session.commit()
+    def put(self, id):
+        name = request.json['name']
+        task = Task(id, name)
+        task.update()
+        return {'status': 'success'}
 
-        tasks = Task.query.all()
-        return tasks
-
-
-class Item(Resource):
-    @marshal_with(taskFields)
-    def get(self, pk):
-        task = Task.query.filter_by(id=pk).first()
-        return task
-
-    @marshal_with(taskFields)
-    def put(self, pk):
-        data = request.json
-        task = Task.query.filter_by(id=pk).first()
-        task.name = data['name']
-        db.session.commit()
-
-        return task
-
-    @marshal_with(taskFields)
-    def delete(self, pk):
-        task = Task.query.filter_by(id=pk).first()
-        db.session.delete(task)
-        db.session.commit()
-
-        tasks = Task.query.all()
-        return tasks
+    def delete(self, id):
+        task = Task(id)
+        task.delete()
+        return {'status': 'success'}
 
 
-# routes
-api.add_resource(Items, '/')
-api.add_resource(Item, '/<int:pk>')
+api.add_resource(TaskAPI, '/', '/<int:id>')
 
 if __name__ == '__main__':
     app.run(debug=True)
